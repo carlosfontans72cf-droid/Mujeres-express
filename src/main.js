@@ -1,7 +1,7 @@
 import { auth, db } from './firebase.js';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { getDoc, doc, setDoc } from 'firebase/firestore';
-import { mostrarPantallaLoginRegistro, cerrarSesion } from './auth/loginRegistro.js';
+import { mostrarPantallaLoginRegistro } from './auth/loginRegistro.js';
 import { mostrarPanelCliente } from './cliente/panelCliente.js';
 import { mostrarPanelComercio } from './comercio/panelComercio.js';
 import { mostrarPanelRepartidor } from './repartidor/panelRepartidor.js';
@@ -9,11 +9,6 @@ import { mostrarPanelDueno } from './dueno/panelDueno.js';
 
 let usuarioActivo = null;
 let rolUsuario = null;
-let uidComercio = null;
-
-export function obtenerUsuarioActivo() {
-  return { usuarioActivo, rolUsuario };
-}
 
 async function cargarPaginaSegunRol(rol) {
   const app = document.getElementById('app');
@@ -38,40 +33,24 @@ async function cargarPaginaSegunRol(rol) {
   }
 
   switch(rol) {
-    case 'cliente':
-      await mostrarPanelCliente(app);
-      break;
-    case 'comercio':
-      await mostrarPanelComercio(app, usuarioActivo.uid);
-      break;
-    case 'repartidor':
-      await mostrarPanelRepartidor(app);
-      break;
+    case 'cliente': await mostrarPanelCliente(app); break;
+    case 'comercio': await mostrarPanelComercio(app, usuarioActivo.uid); break;
+    case 'repartidor': await mostrarPanelRepartidor(app); break;
     case 'admin':
-    case 'dueño':
-      await mostrarPanelDueno(app);
-      break;
-    default:
-      mostrarPantallaLoginRegistro(app);
+    case 'dueño': await mostrarPanelDueno(app); break;
+    default: mostrarPantallaLoginRegistro(app);
   }
 }
 
 onAuthStateChanged(auth, async (user) => {
   usuarioActivo = user;
-  
   if (user) {
     try {
-      const refUsuario = doc(db, 'usuarios', user.uid);
-      const snapshot = await getDoc(refUsuario);
-      if (snapshot.exists()) {
-        rolUsuario = snapshot.data().rol;
-      }
-    } catch (error) {
-      console.log('Error:', error.message);
-    }
+      const snap = await getDoc(doc(db, 'usuarios', user.uid));
+      if (snap.exists()) rolUsuario = snap.data().rol;
+    } catch {}
   } else {
     rolUsuario = null;
   }
-
   cargarPaginaSegunRol(rolUsuario);
 });
