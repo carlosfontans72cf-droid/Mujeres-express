@@ -1,12 +1,11 @@
-import { auth } from './firebase.js';
+import { auth, db } from './firebase.js';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { getDoc, doc } from 'firebase/firestore';
-import { db } from './firebase.js';
+import { getDoc, doc, setDoc } from 'firebase/firestore';
 import { mostrarPantallaLoginRegistro, cerrarSesion } from './auth/loginRegistro.js';
-import { mostrarPanelCliente } from './panels/cliente/panelCliente.js';
-import { mostrarPanelComercio } from './panels/comercio/panelComercio.js';
-import { mostrarPanelRepartidor } from './panels/repartidor/panelRepartidor.js';
-import { mostrarPanelDueno } from './panels/dueno/panelDueno.js';
+import { mostrarPanelCliente } from './cliente/panelCliente.js';
+import { mostrarPanelComercio } from './comercio/panelComercio.js';
+import { mostrarPanelRepartidor } from './repartidor/panelRepartidor.js';
+import { mostrarPanelDueno } from './dueno/panelDueno.js';
 
 let usuarioActivo = null;
 let rolUsuario = null;
@@ -24,7 +23,6 @@ async function cargarPaginaSegunRol(rol) {
     return;
   }
 
-  // El PRIMER usuario en la base se convierte en Dueño automáticamente
   const refContador = doc(db, 'contadores', 'usuarios');
   const snapContador = await getDoc(refContador);
   if (!snapContador.exists()) {
