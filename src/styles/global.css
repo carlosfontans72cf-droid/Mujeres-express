@@ -1,0 +1,96 @@
+:root {
+  --color-primario: #9c27b0;
+  --color-primario-claro: #ba68c8;
+  --color-primario-oscuro: #7b1fa2;
+  --color-fondo: #fafafa;
+  --color-tarjeta: #ffffff;
+  --color-texto: #212121;
+  --color-texto-claro: #757575;
+  --color-exito: #4caf50;
+  --color-alerta: #ff9800;
+  --color-peligro: #f44336;
+  --borde-redondo: 8px;
+  --sombra-suave: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--color-fondo);
+  color: var(--color-texto);
+  line-height: 1.6;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--borde-redondo);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button.primario {
+  background-color: var(--color-primario);
+  color: white;
+}
+
+button.primario:hover {
+  background-color: var(--color-primario-oscuro);
+}
+
+button.exito {
+  background-color: var(--color-exito);
+  color: white;
+}
+
+button.alerta {
+  background-color: var(--color-alerta);
+  color: white;
+}
+
+button.peligro {
+  background-color: var(--color-peligro);
+  color: white;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0 16px 0;
+  border: 1px solid #ddd;
+  border-radius: var(--borde-redondo);
+  font-size: 15px;
+}
+
+.tarjeta {
+  background: var(--color-tarjeta);
+  padding: 20px;
+  border-radius: var(--borde-redondo);
+  box-shadow: var(--sombra-suave);
+  margin-bottom: 16px;
+}
+
+h1, h2, h3 {
+  margin-bottom: 16px;
+  color: var(--color-primario-oscuro);
+}
+
+.texto-centro {
+  text-align: center;
+}
+
+.oculto {
+  display: none !important;
+}
