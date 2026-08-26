@@ -1,6 +1,6 @@
 import { db, auth } from '../firebase.js';
 import { signOut } from 'firebase/auth';
-import { collection, getDocs, addDoc, doc, getDoc, setDoc, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, setDoc, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { calcularMontos } from '../utils/calculos.js';
 
 let carrito = [];
@@ -35,7 +35,11 @@ export async function mostrarPanelCliente(contenedor) {
 
   document.getElementById('btnCerrarSesion').onclick = () => signOut(auth);
   document.getElementById('btnConfirmarPedido').onclick = confirmarPedido;
-  document.getElementById('btnVaciarCarrito').onclick = () => { carrito = []; comercioSeleccionado = null; cargarCarrito(); };
+  document.getElementById('btnVaciarCarrito').onclick = () => { 
+    carrito = []; 
+    comercioSeleccionado = null; 
+    cargarCarrito(); 
+  };
 
   await cargarComercios();
   await cargarMisPedidos();
@@ -157,7 +161,11 @@ async function cargarMisPedidos() {
   const caja = document.getElementById('listaPedidos');
   caja.innerHTML = '';
 
-  if (snap.empty) { caja.innerHTML = '<p>No tienes pedidos aún.</p>'; return; }
+  if (snap.empty) { 
+    caja.innerHTML = '<p>No tienes pedidos aún.</p>'; 
+    return; 
+  }
+
   snap.forEach(doc => {
     const p = doc.data();
     const estilos = {
@@ -177,14 +185,22 @@ async function cargarMisPedidos() {
           <p>⭐ Calificar Comercio:</p>
           <select data-pedido="${doc.id}" data-tipo="comercio" class="selCalif">
             <option value="">Seleccione</option>
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
           </select>
         </div>
         <div>
           <p>⭐ Calificar Repartidor:</p>
           <select data-pedido="${doc.id}" data-tipo="repartidor" class="selCalif">
             <option value="">Seleccione</option>
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
           </select>
         </div>
       ` : ''}
@@ -198,10 +214,11 @@ async function cargarMisPedidos() {
       const tipo = e.target.dataset.tipo;
       const valor = Number(e.target.value);
       if (!valor) return;
-      await setDoc(doc(db, 'pedidos', pedido), { [`calificacion${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`]: valor }, { merge: true });
+      await setDoc(doc(db, 'pedidos', pedido), { 
+        [`calificacion${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`]: valor 
+      }, { merge: true });
       alert('✅ Calificación guardada.');
       cargarMisPedidos();
     };
   });
-}
 }
