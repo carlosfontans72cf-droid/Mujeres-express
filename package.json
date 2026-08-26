@@ -1,17 +1,17 @@
 {
   "name": "mujer-express",
   "private": true,
-  "type": "module",
+  "version": "1.0.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "vite build"
   },
-  "main": "public/index.html",
   "dependencies": {
     "firebase": "^10.7.0"
   },
   "devDependencies": {
-    "vite": "^5.0.0"
+    "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
