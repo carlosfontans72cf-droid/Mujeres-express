@@ -1,11 +1,13 @@
 {
   "name": "mujer-express",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
+  "main": "public/index.html",
   "dependencies": {
     "firebase": "^10.7.0"
   },
