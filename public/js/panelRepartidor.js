@@ -1,13 +1,12 @@
 import { db, auth } from './firebase.js';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
-
-let misPedidosAceptados = [];
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 
 export async function mostrarPanelRepartidor(usuario) {
+  const nom = usuario.nombreCompleto || usuario.nombre || 'Repartidor';
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="contenedor">
-      <h1>🛵 Bienvenido, ${usuario.nombreCompleto}</h1>
+      <h1>🛵 Bienvenido, ${nom}</h1>
       <hr>
       <h3>📋 Pedidos Disponibles — El primero que acepta, lo entrega</h3>
       <div id="pedidos-disponibles">Cargando pedidos...</div>
@@ -36,14 +35,13 @@ function escucharPedidosDisponibles() {
     } else {
       snap.forEach(d => {
         const p = d.data();
+        const ganancia = Math.round(p.total * 0.07);
         html += `<div style="border:2px solid #28a745; padding:12px; border-radius:8px; margin-bottom:8px; background:#f8fff9;">
           <strong>📍 Dirección:</strong> ${p.direccionCliente}<br>
-          <strong>🏪 Comercio:</strong> ${p.nombreComercio || 'Sin dato'}<br>
+          <strong>📦 Productos:</strong> ${p.productos.map(i=>i.nombre).join(', ')}<br>
           <strong>💰 Total del pedido:</strong> $${p.total}<br>
-          <strong>💵 Tu ganancia (7%):</strong> $${Math.round(p.total * 0.07)}<br>
-          <strong>Productos:</strong>
-          <ul>${p.productos.map(i => `<li>${i.nombre} — $${i.precio}</li>`).join('')}</ul>
-          <button class="boton-confirmar" style="font-size:16px; padding:8px 16px;" onclick="aceptarPedido('${d.id}', ${p.total})">✅ ACEPTO ESTE PEDIDO</button>
+          <strong>💵 Tu ganancia (7%):</strong> $${ganancia}<br>
+          <button class="boton-confirmar" style="font-size:16px; padding:8px 16px; margin-top:8px;" onclick="aceptarPedido('${d.id}', ${p.total})">✅ ACEPTO ESTE PEDIDO</button>
         </div>`;
       });
     }
@@ -57,11 +55,11 @@ async function aceptarPedido(idPedido, total) {
   await updateDoc(doc(db, 'pedidos', idPedido), {
     estado: 'enCamino',
     idRepartidor: auth.currentUser.uid,
-    nombreRepartidor: auth.currentUser.displayName || auth.currentUser.email,
+    nombreRepartidor: auth.currentUser.email,
     gananciaRepartidor: gananciaRepartidor,
     fechaAceptacionRepartidor: new Date()
   });
-  alert(`✅ Pedido aceptado! Tu ganancia será de $${gananciaRepartidor}. Andá al comercio, retirá el pedido y entregalo.`);
+  alert(`✅ Pedido aceptado! Tu ganancia será de $${gananciaRepartidor}. Andá al comercio, retirá el pedido y entregalo. Cobrás directamente al cliente.`);
 }
 
 function escucharMisPedidos() {
@@ -73,11 +71,12 @@ function escucharMisPedidos() {
     } else {
       snap.forEach(d => {
         const p = d.data();
+        const gan = p.gananciaRepartidor || Math.round((p.total||0)*0.07);
         html += `<div style="border:1px solid ${p.estado==='entregado'?'#ccc':'#007bff'}; padding:10px; border-radius:6px; margin-bottom:4px;">
           <strong>Dirección:</strong> ${p.direccionCliente}<br>
           <strong>Estado:</strong> ${p.estado==='enCamino'?'🚚 En camino':'✅ Entregado'}<br>
-          <strong>Ganancia:</strong> $${p.gananciaRepartidor || Math.round((p.total||0)*0.07)}
-          ${p.estado==='enCamino'?`<br><button class="boton-confirmar" onclick="marcarEntregado('${d.id}')">✅ Marcar como ENTREGADO</button>`:''}
+          <strong>Ganancia:</strong> $${gan}
+          ${p.estado==='enCamino'?`<br><button class="boton-confirmar" style="margin-top:4px;" onclick="marcarEntregado('${d.id}')">✅ Marcar como ENTREGADO</button>`:''}
         </div>`;
       });
     }

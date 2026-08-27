@@ -1,5 +1,5 @@
 import { db, auth } from './firebase.js';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, addDoc, orderBy } from 'firebase/firestore';
 
 let comerciosLista = [];
 let carrito = [];
@@ -7,9 +7,11 @@ let comercioSeleccionado = null;
 
 export async function mostrarPanelCliente(usuario) {
   const app = document.getElementById('app');
+  const nom = usuario.nombreCompleto || usuario.nombre || 'Usuario';
+  
   app.innerHTML = `
     <div class="contenedor">
-      <h1>👤 Bienvenido, ${usuario.nombreCompleto}</h1>
+      <h1>👤 Bienvenido, ${nom}</h1>
       <hr>
       <h3>🏪 Elegí un Comercio</h3>
       <div id="lista-comercios">Cargando comercios...</div>
@@ -46,7 +48,7 @@ export async function mostrarPanelCliente(usuario) {
   };
   window.cerrarSesion = () => location.reload();
 
-  cargarComercios();
+  await cargarComercios();
 }
 
 async function cargarComercios() {
@@ -60,11 +62,12 @@ async function cargarComercios() {
     html = '<p>No hay comercios disponibles por el momento.</p>';
   } else {
     comerciosLista.forEach(c => {
+      const nomCom = c.nombreCompleto || c.nombre || 'Comercio';
       html += `<div style="border:1px solid #ccc; padding:10px; margin:4px; border-radius:6px;">
-        <strong>${c.nombreCompleto}</strong><br>
+        <strong>${nomCom}</strong><br>
         ⭐ Calificación: ${c.calificacion ? c.calificacion.toFixed(1) : 'Sin calificar'}
         <br>
-        <button class="boton-confirmar" onclick="elegirComercio('${c.uid}','${c.nombreCompleto}')">🔍 Ver Productos</button>
+        <button class="boton-confirmar" onclick="elegirComercio('${c.uid}','${nomCom}')">🔍 Ver Productos</button>
       </div>`;
     });
   }
@@ -88,12 +91,14 @@ async function cargarProductosComercio(idComercio) {
   snap.forEach(d => {
     const p = d.data();
     if (p.activo !== false) {
+      const precioMostrar = p.esOferta ? `<s>$${p.precio}</s> <span style="color:red; font-weight:bold;">$${p.precioRebajado}</span>` : `$${p.precio}`;
+      const precioValor = p.esOferta ? p.precioRebajado : p.precio;
       html += `<div style="border:1px solid #ddd; padding:8px; margin:4px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <strong>${p.nombre}</strong> — $${p.esOferta ? `<s>${p.precio}</s> <span style="color:red;">$${p.precioRebajado}</span>` : p.precio}
-          <br><small>${p.categoria}</small>
+          <strong>${p.nombre}</strong> — ${precioMostrar}
+          <br><small>${p.categoria || ''}</small>
         </div>
-        <button class="boton-confirmar" onclick="agregarAlCarrito('${d.id}', '${p.nombre}', ${p.esOferta ? p.precioRebajado : p.precio})">➕ Agregar</button>
+        <button class="boton-confirmar" onclick="agregarAlCarrito('${d.id}', '${p.nombre.replace(/'/g,"\\'")}', ${precioValor})">➕ Agregar</button>
       </div>`;
     }
   });
@@ -117,7 +122,7 @@ function actualizarCarrito() {
     total += item.precio;
     html += `<div style="display:flex; justify-content:space-between; padding:4px 0;">
       <span>${item.nombre}</span>
-      <span>$${item.precio} <button style="color:red; padding:0 4px;" onclick="quitarDelCarrito(${i})">✕</button></span>
+      <span>$${item.precio} <button style="color:red; padding:0 4px; border:none; background:none; cursor:pointer;" onclick="quitarDelCarrito(${i})">✕</button></span>
     </div>`;
   });
   document.getElementById('lista-carrito').innerHTML = html;
@@ -135,7 +140,7 @@ async function confirmarPedido() {
   await addDoc(collection(db, 'pedidos'), {
     idCliente: auth.currentUser.uid,
     idComercio: comercioSeleccionado,
-    nombreCliente: auth.currentUser.displayName || auth.currentUser.email,
+    nombreCliente: auth.currentUser.email,
     direccionCliente: direccion,
     productos: carrito,
     total: total,
