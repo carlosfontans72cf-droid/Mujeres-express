@@ -1,7 +1,6 @@
 import { auth, db } from './firebase.js';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { setDoc, doc } from 'firebase/firestore';
-import { obtenerUsuarioActivo } from './main.js';
 
 export function mostrarPantallaLoginRegistro() {
   const app = document.getElementById('app');
@@ -81,7 +80,10 @@ export function mostrarPantallaLoginRegistro() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, correo, clave);
       await setDoc(doc(db, 'usuarios', cred.user.uid), {
-        nombreCompleto, correo, rol,
+        nombre: nombre,
+        nombreCompleto: nombre,
+        correo: correo,
+        rol: rol,
         estado: rol === 'cliente' ? 'aprobado' : 'pendiente',
         fechaRegistro: new Date()
       });
