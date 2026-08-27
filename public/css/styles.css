@@ -1,24 +1,181 @@
-:root {
-  --color-primario: #e91e63;
-  --color-exito: #2ecc71;
-  --color-peligro: #e74c3c;
-  --color-alerta: #f39c12;
-  --color-azul: #3498db;
-  --texto-oscuro: #2c3e50;
-  --claro: #f8f9fa;
-  --borde: #ddd;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }
-body { background: var(--claro); color: var(--texto-oscuro); padding: 10px; }
-.tarjeta { background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-.texto-centro { text-align: center; }
-.oculto { display: none !important; }
-h1, h2, h3, h4 { margin-bottom: 12px; color: var(--texto-oscuro); }
-button, select, input { width: 100%; padding: 10px; margin: 6px 0; border-radius: 6px; border: 1px solid var(--borde); font-size: 15px; }
-button { cursor: pointer; border: none; font-weight: 600; }
-.primario { background: var(--color-primario); color: white; }
-.exito { background: var(--color-exito); color: white; }
-.peligro { background: var(--color-peligro); color: white; }
-.alerta { background: var(--color-alerta); color: white; }
-hr { border: none; border-top: 1px solid var(--borde); margin: 12px 0; }
-a { color: var(--color-primario); text-decoration: none; }
+
+body {
+  background-color: #00f0ff;
+  min-height: 100vh;
+  padding: 18px;
+  color: #5a005a;
+}
+
+.contenedor {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 30px;
+  box-shadow: 0 6px 14px rgba(90, 0, 90, 0.15);
+  border: 2px solid #d6006e;
+}
+
+h1, h2, h3 {
+  color: #5a005a;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 22px;
+  border-bottom: 2px solid #d6006e;
+  padding-bottom: 8px;
+}
+
+.boton-principal {
+  background-color: #d6006e;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  margin: 8px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.boton-principal:hover {
+  background-color: #b8005c;
+}
+
+.boton-confirmar {
+  background-color: #00a850;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  margin: 8px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.boton-confirmar:hover {
+  background-color: #008f3f;
+}
+
+.boton-alerta {
+  background-color: #b00020;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  margin: 8px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.boton-alerta:hover {
+  background-color: #8a0018;
+}
+
+.boton-secundario {
+  background-color: #444444;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  margin: 8px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.boton-secundario:hover {
+  background-color: #222222;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0 16px 0;
+  border: 1px solid #d6006e;
+  border-radius: 6px;
+  font-size: 15px;
+  color: #5a005a;
+  background-color: #fff8fc;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #5a005a;
+  box-shadow: 0 0 0 2px rgba(214, 0, 110, 0.25);
+}
+
+.tarjeta {
+  background: #ffffff;
+  border: 1px solid #d6006e;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: 0 4px 10px rgba(90, 0, 90, 0.12);
+}
+
+.texto-centro {
+  text-align: center;
+}
+
+.oculto {
+  display: none !important;
+}
+
+.fila-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+hr {
+  border: none;
+  border-top: 2px solid #d6006e;
+  margin: 24px 0;
+}
+
+.etiqueta {
+  font-weight: bold;
+  display: block;
+  margin: 12px 0 4px 0;
+  color: #5a005a;
+}
+
+.logo-marca {
+  display: block;
+  margin: 0 auto 20px auto;
+  width: 180px;
+  height: auto;
+}
+
+.barra-superior {
+  background-color: #5a005a;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
