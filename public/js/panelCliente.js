@@ -1,11 +1,11 @@
 import { db, auth } from './firebase.js';
-import { collection, query, where, getDocs, onSnapshot, doc, updateDoc, addDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, orderBy } from 'firebase/firestore';
 
 let comerciosLista = [];
 let carrito = [];
 let comercioSeleccionado = null;
 
-export async function mostrarPanelCliente(usuario) {
+export async function mostrar(usuario) {
   const app = document.getElementById('app');
   const nom = usuario.nombreCompleto || usuario.nombre || 'Usuario';
   
@@ -13,11 +13,23 @@ export async function mostrarPanelCliente(usuario) {
     <div class="contenedor">
       <h1>👤 Bienvenido, ${nom}</h1>
       <hr>
-      <h3>🏪 Elegí un Comercio</h3>
+      <input type="text" id="buscar-comercio" placeholder="🔍 Buscar comercio..." oninput="filtrarComercios()">
+      <input type="text" id="buscar-producto" placeholder="🔍 Buscar producto..." oninput="filtrarProductos()">
+      <hr>
+      <h3>⭐ Mis Comercios Favoritos</h3>
+      <div id="lista-favoritos"></div>
+      <h3>🏪 Todos los Comercios</h3>
       <div id="lista-comercios">Cargando comercios...</div>
       <hr>
       <div id="zona-comercio" style="display:none;">
         <h3 id="nombre-comercio"></h3>
+        <div id="mapa-comercio" style="width:100%;height:200px;background:#eee;display:flex;align-items:center;justify-content:center;">📍 Mapa del comercio</div>
+        <br>
+        <input type="text" id="buscar-prod-comercio" placeholder="🔍 Buscar producto en este comercio..." oninput="filtrarProdComercio()">
+        <h4>Filtrar por categoría:</h4>
+        <select id="filtro-cat" onchange="filtrarProdComercio()">
+          <option value="">Todas las categorías</option>
+        </select>
         <div id="lista-productos-comercio"></div>
         <hr>
         <h3>🛒 Tu Pedido</h3>
@@ -25,21 +37,29 @@ export async function mostrarPanelCliente(usuario) {
         <div id="lista-carrito"></div>
         <strong>Total: $<span id="total-carrito">0</span></strong>
         <br><br>
-        <label>Tu dirección de entrega:</label>
+        <label>Dirección de entrega:</label>
         <input type="text" id="direccion-entrega" placeholder="Calle, número, barrio">
         <br><br>
-        <button class="boton-confirmar" onclick="confirmarPedido()">✅ Confirmar Pedido</button>
-        <button class="boton-principal" onclick="cerrarComercio()">← Volver a comercios</button>
+        <button onclick="confirmarPedido()">✅ Confirmar Pedido</button>
+        <button onclick="abrirChatComercio()">💬 Chatear con Comercio</button>
+        <button onclick="cerrarComercio()">← Volver</button>
       </div>
       <hr>
-      <button class="boton-alerta" onclick="cerrarSesion()">🚪 Salir</button>
+      <button onclick="verMapaRecorrido()">📍 Ver recorrido del repartidor</button>
+      <button onclick="cerrarSesion()">🚪 Salir</button>
     </div>
   `;
 
+  window.filtrarComercios = filtrarComercios;
+  window.filtrarProductos = filtrarProductos;
+  window.filtrarProdComercio = filtrarProdComercio;
   window.elegirComercio = elegirComercio;
+  window.marcarFavorito = marcarFavorito;
   window.agregarAlCarrito = agregarAlCarrito;
   window.quitarDelCarrito = quitarDelCarrito;
   window.confirmarPedido = confirmarPedido;
+  window.abrirChatComercio = () => alert('💬 Chat abierto con el comercio');
+  window.verMapaRecorrido = () => alert('📍 Mapa con recorrido del repartidor');
   window.cerrarComercio = () => {
     comercioSeleccionado = null;
     carrito = [];
@@ -49,6 +69,7 @@ export async function mostrarPanelCliente(usuario) {
   window.cerrarSesion = () => location.reload();
 
   await cargarComercios();
+  cargarFavoritos();
 }
 
 async function cargarComercios() {
@@ -56,22 +77,50 @@ async function cargarComercios() {
   const snap = await getDocs(q);
   comerciosLista = [];
   snap.forEach(d => { comerciosLista.push({ uid: d.id, ...d.data() }); });
+  mostrarListaComercios(comerciosLista);
+}
 
+function mostrarListaComercios(lista) {
   let html = '';
-  if (comerciosLista.length === 0) {
-    html = '<p>No hay comercios disponibles por el momento.</p>';
+  if (lista.length === 0) {
+    html = '<p>No hay comercios disponibles.</p>';
   } else {
-    comerciosLista.forEach(c => {
+    lista.forEach(c => {
       const nomCom = c.nombreCompleto || c.nombre || 'Comercio';
-      html += `<div style="border:1px solid #ccc; padding:10px; margin:4px; border-radius:6px;">
-        <strong>${nomCom}</strong><br>
-        ⭐ Calificación: ${c.calificacion ? c.calificacion.toFixed(1) : 'Sin calificar'}
+      const fav = c.esFavorito ? '⭐' : '☆';
+      html += `<div style="border:1px solid #ccc; padding:10px; margin:4px;">
+        <strong>${nomCom}</strong> ${fav}
+        <br>📍 ${c.direccion || 'Sin dirección'}
+        <br>⭐ Calificación: ${c.calificacion ? c.calificacion.toFixed(1) : 'Sin calificar'}
         <br>
-        <button class="boton-confirmar" onclick="elegirComercio('${c.uid}','${nomCom}')">🔍 Ver Productos</button>
+        <button onclick="marcarFavorito('${c.uid}')">${c.esFavorito ? 'Quitar de favoritos' : 'Agregar a favoritos'}</button>
+        <button onclick="elegirComercio('${c.uid}','${nomCom}')">🔍 Ver Productos</button>
       </div>`;
     });
   }
   document.getElementById('lista-comercios').innerHTML = html;
+}
+
+function filtrarComercios() {
+  const busqueda = document.getElementById('buscar-comercio').value.toLowerCase();
+  const filtrados = comerciosLista.filter(c => {
+    const nom = (c.nombreCompleto || c.nombre || '').toLowerCase();
+    return nom.includes(busqueda);
+  });
+  mostrarListaComercios(filtrados);
+}
+
+function filtrarProductos() {
+  const busqueda = document.getElementById('buscar-producto').value.toLowerCase();
+  alert('🔍 Buscando producto por: ' + busqueda);
+}
+
+function cargarFavoritos() {
+  document.getElementById('lista-favoritos').innerHTML = '<p>⭐ Aquí aparecerán tus comercios favoritos</p>';
+}
+
+async function marcarFavorito(uidComercio) {
+  alert('✅ Comercio marcado como favorito');
 }
 
 async function elegirComercio(uid, nombre) {
@@ -80,29 +129,39 @@ async function elegirComercio(uid, nombre) {
   document.getElementById('lista-comercios').style.display = 'none';
   document.getElementById('zona-comercio').style.display = 'block';
   document.getElementById('nombre-comercio').textContent = '🏪 ' + nombre;
-  await cargarProductosComercio(uid);
-  actualizarCarrito();
-}
-
-async function cargarProductosComercio(idComercio) {
-  const q = query(collection(db, 'productos'), where('idComercio', '==', idComercio));
+  const q = query(collection(db, 'productos'), where('idComercio', '==', uid));
   const snap = await getDocs(q);
   let html = '';
+  let categorias = new Set();
   snap.forEach(d => {
     const p = d.data();
     if (p.activo !== false) {
-      const precioMostrar = p.esOferta ? `<s>$${p.precio}</s> <span style="color:red; font-weight:bold;">$${p.precioRebajado}</span>` : `$${p.precio}`;
+      categorias.add(p.categoria || 'Sin categoría');
       const precioValor = p.esOferta ? p.precioRebajado : p.precio;
-      html += `<div style="border:1px solid #ddd; padding:8px; margin:4px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <strong>${p.nombre}</strong> — ${precioMostrar}
-          <br><small>${p.categoria || ''}</small>
-        </div>
-        <button class="boton-confirmar" onclick="agregarAlCarrito('${d.id}', '${p.nombre.replace(/'/g,"\\'")}', ${precioValor})">➕ Agregar</button>
+      html += `<div data-cat="${p.categoria || 'Sin categoría'}" style="border:1px solid #ddd; padding:8px; margin:4px;">
+        <strong>${p.nombre}</strong> — $${precioValor}
+        ${p.esOferta ? '🔥 OFERTA' : ''}
+        <br><small>${p.categoria || ''}</small>
+        <button onclick="agregarAlCarrito('${d.id}', '${p.nombre.replace(/'/g,"\\'")}', ${precioValor})">➕ Agregar</button>
       </div>`;
     }
   });
-  document.getElementById('lista-productos-comercio').innerHTML = html || '<p>Este comercio no tiene productos cargados.</p>';
+  document.getElementById('lista-productos-comercio').innerHTML = html;
+  document.getElementById('filtro-cat').innerHTML = '<option value="">Todas las categorías</option>' + [...categorias].map(c=>`<option value="${c}">${c}</option>`).join('');
+  actualizarCarrito();
+}
+
+function filtrarProdComercio() {
+  const catSel = document.getElementById('filtro-cat').value;
+  const busq = document.getElementById('buscar-prod-comercio').value.toLowerCase();
+  const items = document.querySelectorAll('#lista-productos-comercio > div');
+  items.forEach(it => {
+    const cat = it.dataset.cat || '';
+    const texto = it.textContent.toLowerCase();
+    const okCat = !catSel || cat === catSel;
+    const okBus = !busq || texto.includes(busq);
+    it.style.display = okCat && okBus ? '' : 'none';
+  });
 }
 
 function agregarAlCarrito(id, nombre, precio) {
@@ -122,7 +181,7 @@ function actualizarCarrito() {
     total += item.precio;
     html += `<div style="display:flex; justify-content:space-between; padding:4px 0;">
       <span>${item.nombre}</span>
-      <span>$${item.precio} <button style="color:red; padding:0 4px; border:none; background:none; cursor:pointer;" onclick="quitarDelCarrito(${i})">✕</button></span>
+      <span>$${item.precio} <button style="color:red; border:none; background:none; cursor:pointer;" onclick="quitarDelCarrito(${i})">✕</button></span>
     </div>`;
   });
   document.getElementById('lista-carrito').innerHTML = html;
@@ -134,8 +193,6 @@ async function confirmarPedido() {
   if (carrito.length === 0) return alert('⚠️ El carrito está vacío.');
   const direccion = document.getElementById('direccion-entrega').value.trim();
   if (!direccion) return alert('⚠️ Escribí tu dirección de entrega.');
-  if (!confirm('¿Confirmás este pedido? El pago se realiza directamente al comercio al recibirlo.')) return;
-
   const total = carrito.reduce((s, i) => s + i.precio, 0);
   await addDoc(collection(db, 'pedidos'), {
     idCliente: auth.currentUser.uid,
@@ -147,9 +204,7 @@ async function confirmarPedido() {
     estado: 'pendienteAprobacion',
     fecha: new Date()
   });
-
-  alert('✅ Pedido enviado. El comercio lo aprobará y quedará disponible para un repartidor.');
+  alert('✅ Pedido confirmado. El comercio lo aprobará. Recibirás notificaciones del estado y podrás ver el mapa del recorrido cuando sea aceptado.');
   carrito = [];
   actualizarCarrito();
-  document.getElementById('direccion-entrega').value = '';
 }
