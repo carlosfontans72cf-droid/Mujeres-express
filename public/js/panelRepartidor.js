@@ -28,7 +28,12 @@ export async function mostrar(usuario) {
   window.verRutaMapa = verRutaMapa;
   window.abrirChatConCliente = (nombre) => alert(`💬 Chat con el cliente: ${nombre}`);
   window.abrirChatConComercio = (nombre) => alert(`💬 Chat con el comercio: ${nombre}`);
-  window.cerrarSesion = () => location.reload();
+  window.cerrarSesion = async () => {
+  const { signOut } = await import('firebase/auth');
+  const { auth } = await import('./firebase.js');
+  await signOut(auth);
+  location.reload();
+};
 
   escucharPedidosDisponibles();
   escucharMisPedidos();

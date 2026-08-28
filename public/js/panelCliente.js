@@ -66,7 +66,12 @@ export async function mostrar(usuario) {
     document.getElementById('zona-comercio').style.display = 'none';
     document.getElementById('lista-comercios').style.display = 'block';
   };
-  window.cerrarSesion = () => location.reload();
+  window.cerrarSesion = async () => {
+  const { signOut } = await import('firebase/auth');
+  const { auth } = await import('./firebase.js');
+  await signOut(auth);
+  location.reload();
+};
 
   await cargarComercios();
   cargarFavoritos();

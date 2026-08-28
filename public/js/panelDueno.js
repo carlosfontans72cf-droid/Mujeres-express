@@ -65,7 +65,12 @@ export async function mostrar(usuario) {
   window.crearAdministrador = crearAdministrador;
   window.exportarReportes = () => alert('📲 Reporte compartido por WhatsApp');
   window.exportarTodoExcel = () => alert('📊 Reporte completo exportado');
-  window.cerrarSesion = () => location.reload();
+  window.cerrarSesion = async () => {
+  const { signOut } = await import('firebase/auth');
+  const { auth } = await import('./firebase.js');
+  await signOut(auth);
+  location.reload();
+};
 
   await cargarComisiones();
   await cargarUsuarios();

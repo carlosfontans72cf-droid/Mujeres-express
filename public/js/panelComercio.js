@@ -75,7 +75,12 @@ export async function mostrar(usuario) {
   window.compartirPorWhatsApp = compartirPorWhatsApp;
   window.exportarHistorial = exportarHistorial;
   window.abrirChatConCliente = (nombre) => alert(`💬 Chat abierto con: ${nombre}`);
-  window.cerrarSesion = () => location.reload();
+  window.cerrarSesion = async () => {
+  const { signOut } = await import('firebase/auth');
+  const { auth } = await import('./firebase.js');
+  await signOut(auth);
+  location.reload();
+};
 
   cargarPedidosPendientes();
   await cargarMisProductos();
