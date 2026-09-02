@@ -1,5 +1,7 @@
 import { db, auth } from './firebase.js';
 import { collection, getDocs, doc, updateDoc, onSnapshot, query, where, orderBy, addDoc } from 'firebase/firestore';
+import { avisoAntiEstafaHTML } from './avisoAntiEstafa.js';
+import { abrirChat } from './chat.js';
 
 const CATEGORIAS = [
   "Panadería", "Carnicería", "Verdulería", "Frutería", "Rotisería",
@@ -7,14 +9,30 @@ const CATEGORIAS = [
 ];
 
 let todosLosProductos = [];
+let comisionAppPct = 10;
+let comisionRepartidorPct = 7;
+
+async function cargarComisionesConfig() {
+  const snap = await getDocs(query(collection(db, 'configuracion'), where('tipo', '==', 'comisiones')));
+  if (!snap.empty) {
+    const cfg = snap.docs[0].data();
+    comisionAppPct = cfg.porcentajeApp ?? 10;
+    comisionRepartidorPct = cfg.porcentajeRepartidor ?? 7;
+  }
+}
+
+let miCiudadId = null;
 
 export async function mostrar(usuario) {
+  await cargarComisionesConfig();
+  miCiudadId = usuario.ciudadId || null;
   const nom = usuario.nombreCompleto || usuario.nombre || 'Comercio';
   const app = document.getElementById('app');
 
   app.innerHTML = `
     <div class="contenedor">
       <h1>🏪 ${nom}</h1>
+      ${avisoAntiEstafaHTML()}
       <hr>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
         <button onclick="cambiarSeccion('agregar')">➕ Agregar Producto</button>
@@ -69,12 +87,16 @@ export async function mostrar(usuario) {
   window.marcarOferta = marcarOferta;
   window.duplicarProducto = duplicarProducto;
   window.suspenderProducto = suspenderProducto;
+  window.pausarOferta = pausarOferta;
+  window.reactivarProducto = reactivarProducto;
+  window.eliminarProducto = eliminarProducto;
+  window.modificarProducto = modificarProducto;
   window.filtrarMisProductos = filtrarMisProductos;
   window.guardarPerfil = guardarPerfil;
   window.subirListaPrecios = () => alert('📄 Seleccioná tu archivo Excel con la lista de precios');
   window.compartirPorWhatsApp = compartirPorWhatsApp;
   window.exportarHistorial = exportarHistorial;
-  window.abrirChatConCliente = (nombre) => alert(`💬 Chat abierto con: ${nombre}`);
+  window.abrirChatConCliente = (uid, nombre) => { if (uid) abrirChat(uid, nombre); };
   window.cerrarSesion = async () => {
   const { signOut } = await import('firebase/auth');
   const { auth } = await import('./firebase.js');
@@ -108,7 +130,7 @@ async function guardarProducto() {
   if (!nombre || !precio || !categoria) return alert('⚠️ Completá nombre, precio y categoría');
 
   await addDoc(collection(db, 'productos'), {
-    idComercio: auth.currentUser.uid, nombre, descripcion, categoria, precio,
+    idComercio: auth.currentUser.uid, ciudadId: miCiudadId, nombre, nombreLower: nombre.toLowerCase(), descripcion, categoria, precio,
     precioRebajado: null, esOferta: false, activo: true, fechaCreacion: new Date()
   });
   alert('✅ Producto guardado');
@@ -127,13 +149,13 @@ function cargarPedidosPendientes() {
     } else {
       snap.forEach(d => {
         const p = d.data();
-        const totalComercio = Math.round((p.total || 0) * 0.83);
+        const totalComercio = Math.round((p.total || 0) * (1 - (comisionAppPct + comisionRepartidorPct) / 100));
         html += `<div style="border:1px solid #ccc; padding:10px; margin:4px;">
           <strong>Cliente:</strong> ${p.nombreCliente}
-          <button onclick="abrirChatConCliente('${p.nombreCliente}')" style="margin-left:8px;">💬 Chat</button><br>
+          <button onclick="abrirChatConCliente('${p.idCliente}','${(p.nombreCliente||'').replace(/'/g,"\\'")}')" style="margin-left:8px;">💬 Chat</button><br>
           <strong>Dirección:</strong> ${p.direccionCliente}<br>
           <strong>Total del pedido:</strong> $${p.total}<br>
-          <strong>Tu parte (83%):</strong> $${totalComercio}<br>
+          <strong>Tu parte (${100-comisionAppPct-comisionRepartidorPct}%):</strong> $${totalComercio}<br>
           <strong>Productos:</strong> ${p.productos.map(x => x.nombre).join(', ')}<br>
           <button onclick="aprobarPedido('${d.id}')">✅ APROBAR</button>
         </div>`;
@@ -161,14 +183,21 @@ async function cargarMisProductos() {
 
 function mostrarListaProductos(lista) {
   let html = '';
-  lista.filter(p => p.activo !== false).forEach(p => {
+  lista.forEach(p => {
+    const suspendido = p.activo === false;
     const precioMostrar = p.esOferta ? `<s>$${p.precio}</s> 🔥 $${p.precioRebajado}` : `$${p.precio}`;
-    html += `<div data-cat="${p.categoria || ''}" style="border:1px solid #ddd; padding:8px; margin:4px;">
-      <strong>${p.nombre}</strong> — ${precioMostrar}<br>
+    html += `<div data-cat="${p.categoria || ''}" style="border:1px solid #ddd; padding:8px; margin:4px; ${suspendido ? 'opacity:0.6;background:#f5f5f5;' : ''}">
+      <strong>${p.nombre}</strong> — ${precioMostrar} ${suspendido ? '⏸️ (suspendido)' : ''}<br>
       ${p.descripcion || ''} — ${p.categoria || 'Sin categoría'}<br>
-      <button onclick="marcarOferta('${p.id}',${p.precio})">🔥 Oferta</button>
-      <button onclick="duplicarProducto('${p.id}')">📋 Copiar</button>
-      <button onclick="suspenderProducto('${p.id}')">⏸️ Suspender</button>
+      ${!suspendido ? `
+        ${p.esOferta
+          ? `<button onclick="pausarOferta('${p.id}')">⏸️ Pausar oferta</button>`
+          : `<button onclick="marcarOferta('${p.id}',${p.precio})">🔥 Oferta</button>`}
+        <button onclick="modificarProducto('${p.id}')">✏️ Modificar</button>
+        <button onclick="duplicarProducto('${p.id}')">📋 Copiar</button>
+        <button onclick="suspenderProducto('${p.id}')">⏸️ Suspender</button>
+      ` : `<button onclick="reactivarProducto('${p.id}')">▶️ Reactivar</button>`}
+      <button onclick="eliminarProducto('${p.id}')">🗑️ Eliminar</button>
     </div>`;
   });
   document.getElementById('lista-productos').innerHTML = html || '<p>Sin productos cargados</p>';
@@ -199,7 +228,7 @@ async function duplicarProducto(idProd) {
   const orig = todosLosProductos.find(p => p.id === idProd);
   if (!orig) return;
   await addDoc(collection(db, 'productos'), {
-    idComercio: auth.currentUser.uid, nombre: orig.nombre + ' (copia)',
+    idComercio: auth.currentUser.uid, ciudadId: miCiudadId, nombre: orig.nombre + ' (copia)', nombreLower: (orig.nombre + ' (copia)').toLowerCase(),
     descripcion: orig.descripcion, categoria: orig.categoria, precio: orig.precio,
     activo: true, fechaCreacion: new Date()
   });
@@ -207,8 +236,46 @@ async function duplicarProducto(idProd) {
   cargarMisProductos();
 }
 
+async function pausarOferta(idProd) {
+  await updateDoc(doc(db, 'productos', idProd), { esOferta: false, precioRebajado: null });
+  alert('⏸️ Oferta pausada. El producto vuelve a su precio normal.');
+  cargarMisProductos();
+}
+
+async function reactivarProducto(idProd) {
+  await updateDoc(doc(db, 'productos', idProd), { activo: true });
+  alert('▶️ Producto reactivado.');
+  cargarMisProductos();
+}
+
+async function eliminarProducto(idProd) {
+  if (!confirm('⚠️ ¿Eliminar este producto PERMANENTEMENTE? No se puede deshacer.')) return;
+  await deleteDoc(doc(db, 'productos', idProd));
+  alert('🗑️ Producto eliminado.');
+  cargarMisProductos();
+}
+
+async function modificarProducto(idProd) {
+  const orig = todosLosProductos.find(p => p.id === idProd);
+  if (!orig) return;
+  const nuevoNombre = prompt('Nombre:', orig.nombre);
+  if (nuevoNombre === null) return;
+  const nuevoPrecio = prompt('Precio:', orig.precio);
+  if (nuevoPrecio === null) return;
+  const nuevaDescripcion = prompt('Descripción:', orig.descripcion || '');
+  if (nuevaDescripcion === null) return;
+  const precio = parseFloat(String(nuevoPrecio).replace(',', '.'));
+  if (!nuevoNombre.trim() || isNaN(precio)) return alert('⚠️ Datos inválidos');
+  await updateDoc(doc(db, 'productos', idProd), {
+    nombre: nuevoNombre.trim(), nombreLower: nuevoNombre.trim().toLowerCase(),
+    precio, descripcion: nuevaDescripcion.trim()
+  });
+  alert('✅ Producto modificado');
+  cargarMisProductos();
+}
+
 async function suspenderProducto(idProd) {
-  if (!confirm('¿Suspender este producto? Deja de verse.')) return;
+  if (!confirm('¿Suspender este producto? Deja de verse para los clientes hasta que lo reactives.')) return;
   await updateDoc(doc(db, 'productos', idProd), { activo: false });
   alert('✅ Suspendido');
   cargarMisProductos();
@@ -224,15 +291,32 @@ async function compartirPorWhatsApp() {
 async function exportarHistorial() {
   const q = query(collection(db, 'pedidos'), where('idComercio', '==', auth.currentUser.uid), orderBy('fecha', 'desc'));
   const snap = await getDocs(q);
-  let texto = 'HISTORIAL DE PEDIDOS — Mujer Express\n========================================\n\n';
+  const filas = [];
   let total = 0, comisionApp = 0, comisionRepartidor = 0, netoComercio = 0;
   snap.forEach(d => {
     const p = d.data();
     const t = p.total || 0;
-    texto += `Fecha: ${p.fecha?.toDate().toLocaleDateString()||'Sin fecha'} | Cliente: ${p.nombreCliente} | Total: $${t} | Estado: ${p.estado}\n`;
-    total += t; comisionApp += Math.round(t * 0.10); comisionRepartidor += Math.round(t * 0.07); netoComercio += Math.round(t * 0.83);
+    const parteComercio = Math.round(t * (1 - (comisionAppPct + comisionRepartidorPct) / 100));
+    filas.push({
+      Fecha: p.fecha?.toDate().toLocaleDateString() || 'Sin fecha',
+      Cliente: p.nombreCliente || '',
+      Total: t,
+      Estado: p.estado || '',
+      [`Comisión App (${comisionAppPct}%)`]: Math.round(t * (comisionAppPct / 100)),
+      [`Comisión Repartidor (${comisionRepartidorPct}%)`]: Math.round(t * (comisionRepartidorPct / 100)),
+      [`Tu parte (${100 - comisionAppPct - comisionRepartidorPct}%)`]: parteComercio
+    });
+    total += t;
+    comisionApp += Math.round(t * (comisionAppPct / 100));
+    comisionRepartidor += Math.round(t * (comisionRepartidorPct / 100));
+    netoComercio += parteComercio;
   });
-  texto += `\n========================================\nTOTAL VENDIDO: $${total}\nComisión App (10%): $${comisionApp}\nComisión Repartidor (7%): $${comisionRepartidor}\nTU PARTE (83%): $${netoComercio}`;
-  await navigator.clipboard.writeText(texto);
-  alert('✅ Historial copiado al portapapeles. Pegalo en Excel o compártelo por WhatsApp.');
+  filas.push({});
+  filas.push({ Fecha: 'TOTALES', Total: total, [`Comisión App (${comisionAppPct}%)`]: comisionApp, [`Comisión Repartidor (${comisionRepartidorPct}%)`]: comisionRepartidor, [`Tu parte (${100 - comisionAppPct - comisionRepartidorPct}%)`]: netoComercio });
+
+  const XLSX = await import('xlsx');
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Historial');
+  XLSX.writeFile(libro, `historial-mujeres-express-${new Date().toISOString().slice(0,10)}.xlsx`);
 }

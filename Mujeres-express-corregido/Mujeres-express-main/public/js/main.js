@@ -24,7 +24,20 @@ onAuthStateChanged(auth, async (user) => {
 
     const u = { uid: user.uid, ...snap.data() };
     const nombre = u.nombreCompleto || u.nombre || 'Sin nombre';
-    const { rol, aprobado } = u;
+    const { rol, aprobado, bloqueado } = u;
+
+    // Si el dueño lo bloqueó, no entra aunque esté aprobado
+    if (bloqueado) {
+      document.getElementById('app').innerHTML = `
+        <div class="contenedor">
+          <h2>🚫 Tu cuenta está bloqueada</h2>
+          <p>Hola <strong>${nombre}</strong>, tu cuenta fue bloqueada temporalmente. Contactate con el administrador para más información.</p>
+          <br>
+          <button onclick="cerrarSesion()">Cerrar sesión</button>
+        </div>
+      `;
+      return;
+    }
 
     // Si NO es cliente ni dueño y NO está aprobado → queda pendiente
     if (rol !== 'cliente' && rol !== 'dueno' && !aprobado) {
@@ -52,6 +65,9 @@ onAuthStateChanged(auth, async (user) => {
       mostrar(u);
     } else if (rol === 'dueno') {
       const { mostrar } = await import('./panelDueno.js');
+      mostrar(u);
+    } else if (rol === 'admin') {
+      const { mostrar } = await import('./panelAdmin.js');
       mostrar(u);
     } else {
       mostrarLogin();

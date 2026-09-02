@@ -1,0 +1,110 @@
+// Reglas de Firestore sugeridas para Mujer Express — modelo multi-ciudad.
+//
+// CÓMO USAR: Andá a la consola de Firebase → tu proyecto → Firestore Database
+// → pestaña "Reglas" → pegá esto reemplazando lo que haya → "Publicar".
+//
+// Estas reglas no se aplican solas: hay que publicarlas manualmente en la
+// consola. Este archivo es la referencia, no se sube a Firebase automáticamente.
+//
+// IDEA GENERAL:
+// - El Dueño (rol 'dueno') puede leer y escribir todo, sin restricción de ciudad.
+// - El Admin (rol 'admin') solo puede leer/escribir datos de SU propia ciudad
+//   (comparando su campo ciudadId contra el ciudadId del documento).
+// - Comercios y Repartidores solo pueden tocar sus propios datos.
+// - Los Clientes pueden leer comercios/productos de su ciudad, y crear pedidos
+//   propios, pero no tocar pedidos ajenos.
+// - Los mensajes de chat solo los pueden leer/escribir quienes participan en
+//   esa conversación, o el Dueño/Admin (para poder resolver problemas).
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaLogueado() {
+      return request.auth != null;
+    }
+
+    function miUsuario() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function esDueno() {
+      return estaLogueado() && miUsuario().rol == 'dueno';
+    }
+
+    function esAdminDeLaCiudad(ciudadId) {
+      return estaLogueado() && miUsuario().rol == 'admin' && miUsuario().ciudadId == ciudadId;
+    }
+
+    // --- Usuarios (comercios, repartidores, clientes, admins) ---
+    match /usuarios/{uid} {
+      allow read: if estaLogueado() && (
+        request.auth.uid == uid ||
+        esDueno() ||
+        esAdminDeLaCiudad(resource.data.ciudadId)
+      );
+      allow create: if estaLogueado() && request.auth.uid == uid;
+      allow update: if estaLogueado() && (
+        request.auth.uid == uid ||
+        esDueno() ||
+        esAdminDeLaCiudad(resource.data.ciudadId)
+      );
+      allow delete: if esDueno();
+    }
+
+    // --- Ciudades / Empresas (solo el Dueño las gestiona) ---
+    match /ciudades/{id} {
+      allow read: if estaLogueado();
+      allow write: if esDueno();
+    }
+
+    // --- Comisiones (solo el Dueño las edita, todos pueden leerlas) ---
+    match /configuracion/{id} {
+      allow read: if estaLogueado();
+      allow write: if esDueno();
+    }
+
+    // --- Productos ---
+    match /productos/{id} {
+      allow read: if estaLogueado();
+      allow write: if estaLogueado() && (
+        miUsuario().rol == 'comercio' ||
+        esDueno() ||
+        esAdminDeLaCiudad(resource.data.ciudadId)
+      );
+    }
+
+    // --- Pedidos ---
+    match /pedidos/{id} {
+      allow read: if estaLogueado() && (
+        resource.data.idCliente == request.auth.uid ||
+        resource.data.idComercio == request.auth.uid ||
+        resource.data.idRepartidor == request.auth.uid ||
+        esDueno() ||
+        esAdminDeLaCiudad(resource.data.ciudadId)
+      );
+      allow create: if estaLogueado();
+      allow update: if estaLogueado() && (
+        resource.data.idComercio == request.auth.uid ||
+        resource.data.idRepartidor == request.auth.uid ||
+        request.resource.data.idRepartidor == request.auth.uid ||
+        esDueno() ||
+        esAdminDeLaCiudad(resource.data.ciudadId)
+      );
+    }
+
+    // --- Chats: solo los participantes o el Dueño/Admin ---
+    match /chats/{convId} {
+      allow read, write: if estaLogueado() && (
+        request.auth.uid in resource.data.participantes ||
+        esDueno() ||
+        miUsuario().rol == 'admin'
+      );
+      allow create: if estaLogueado();
+
+      match /mensajes/{msgId} {
+        allow read, create: if estaLogueado();
+      }
+    }
+  }
+}

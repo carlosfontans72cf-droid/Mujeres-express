@@ -1,20 +1,30 @@
 import { db, auth } from './firebase.js';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { avisoAntiEstafaHTML } from './avisoAntiEstafa.js';
+import { abrirChat } from './chat.js';
 
 let comerciosLista = [];
 let carrito = [];
 let comercioSeleccionado = null;
+let comercioSeleccionadoNombre = null;
+let ciudadIdActual = null;
+let ciudadNombreActual = null;
 
 export async function mostrar(usuario) {
   const app = document.getElementById('app');
   const nom = usuario.nombreCompleto || usuario.nombre || 'Usuario';
+  favoritosUid = usuario.favoritos || [];
+  ciudadIdActual = usuario.ciudadId || null;
+  ciudadNombreActual = usuario.ciudadNombre || null;
   
   app.innerHTML = `
     <div class="contenedor">
       <h1>👤 Bienvenido, ${nom}</h1>
+      ${avisoAntiEstafaHTML()}
       <hr>
       <input type="text" id="buscar-comercio" placeholder="🔍 Buscar comercio..." oninput="filtrarComercios()">
-      <input type="text" id="buscar-producto" placeholder="🔍 Buscar producto..." oninput="filtrarProductos()">
+      <input type="text" id="buscar-producto" placeholder="🔍 Buscar producto en todos los comercios..." oninput="filtrarProductos()">
+      <div id="resultados-busqueda-producto"></div>
       <hr>
       <h3>⭐ Mis Comercios Favoritos</h3>
       <div id="lista-favoritos"></div>
@@ -58,7 +68,10 @@ export async function mostrar(usuario) {
   window.agregarAlCarrito = agregarAlCarrito;
   window.quitarDelCarrito = quitarDelCarrito;
   window.confirmarPedido = confirmarPedido;
-  window.abrirChatComercio = () => alert('💬 Chat abierto con el comercio');
+  window.abrirChatComercio = () => {
+    if (!comercioSeleccionado) return;
+    abrirChat(comercioSeleccionado, comercioSeleccionadoNombre);
+  };
   window.verMapaRecorrido = () => alert('📍 Mapa con recorrido del repartidor');
   window.cerrarComercio = () => {
     comercioSeleccionado = null;
@@ -78,10 +91,18 @@ export async function mostrar(usuario) {
 }
 
 async function cargarComercios() {
-  const q = query(collection(db, 'usuarios'), where('rol', '==', 'comercio'), where('estado', '==', 'aprobado'));
+  if (!ciudadIdActual) {
+    document.getElementById('lista-comercios').innerHTML = '<p>⚠️ Tu cuenta no tiene una ciudad asignada. Contactá a soporte.</p>';
+    return;
+  }
+  const q = query(collection(db, 'usuarios'), where('rol', '==', 'comercio'), where('aprobado', '==', true), where('ciudadId', '==', ciudadIdActual));
   const snap = await getDocs(q);
   comerciosLista = [];
-  snap.forEach(d => { comerciosLista.push({ uid: d.id, ...d.data() }); });
+  snap.forEach(d => {
+    const data = d.data();
+    if (data.bloqueado) return; // no mostrar comercios bloqueados
+    comerciosLista.push({ uid: d.id, ...data, esFavorito: favoritosUid.includes(d.id) });
+  });
   mostrarListaComercios(comerciosLista);
 }
 
@@ -115,21 +136,73 @@ function filtrarComercios() {
   mostrarListaComercios(filtrados);
 }
 
+let temporizadorBusqueda = null;
 function filtrarProductos() {
-  const busqueda = document.getElementById('buscar-producto').value.toLowerCase();
-  alert('🔍 Buscando producto por: ' + busqueda);
+  const busqueda = document.getElementById('buscar-producto').value.trim().toLowerCase();
+  const cont = document.getElementById('resultados-busqueda-producto');
+  clearTimeout(temporizadorBusqueda);
+  if (!busqueda) { cont.innerHTML = ''; return; }
+  // Pequeño debounce para no disparar una consulta por cada letra tecleada muy rápido
+  temporizadorBusqueda = setTimeout(async () => {
+    const q = query(
+      collection(db, 'productos'),
+      where('ciudadId', '==', ciudadIdActual),
+      where('nombreLower', '>=', busqueda),
+      where('nombreLower', '<=', busqueda + '\uf8ff')
+    );
+    const snap = await getDocs(q);
+    let html = '';
+    snap.forEach(d => {
+      const p = d.data();
+      if (p.activo === false) return;
+      const comercio = comerciosLista.find(c => c.uid === p.idComercio);
+      const nomCom = comercio ? (comercio.nombreCompleto || comercio.nombre) : 'Comercio';
+      const precioValor = p.esOferta ? p.precioRebajado : p.precio;
+      html += `<div style="border:1px solid #ddd; padding:8px; margin:4px;">
+        <strong>${p.nombre}</strong> — $${precioValor} ${p.esOferta ? '🔥 OFERTA' : ''}
+        <br><small>🏪 ${nomCom}</small>
+        <br><button onclick="elegirComercio('${p.idComercio}','${nomCom.replace(/'/g,"\\'")}')">Ver comercio</button>
+      </div>`;
+    });
+    cont.innerHTML = html || '<p>No se encontraron productos con ese nombre.</p>';
+  }, 200);
 }
 
+let favoritosUid = [];
+
 function cargarFavoritos() {
-  document.getElementById('lista-favoritos').innerHTML = '<p>⭐ Aquí aparecerán tus comercios favoritos</p>';
+  const favs = comerciosLista.filter(c => favoritosUid.includes(c.uid));
+  if (favs.length === 0) {
+    document.getElementById('lista-favoritos').innerHTML = '<p>⭐ Aquí aparecerán tus comercios favoritos</p>';
+    return;
+  }
+  let html = '';
+  favs.forEach(c => {
+    const nomCom = c.nombreCompleto || c.nombre || 'Comercio';
+    html += `<div style="border:1px solid #ccc; padding:10px; margin:4px;">
+      <strong>${nomCom}</strong> ⭐
+      <button onclick="elegirComercio('${c.uid}','${nomCom.replace(/'/g,"\\'")}')">🔍 Ver Productos</button>
+    </div>`;
+  });
+  document.getElementById('lista-favoritos').innerHTML = html;
 }
 
 async function marcarFavorito(uidComercio) {
-  alert('✅ Comercio marcado como favorito');
+  const { arrayUnion, arrayRemove } = await import('firebase/firestore');
+  const yaEsFavorito = favoritosUid.includes(uidComercio);
+  await updateDoc(doc(db, 'usuarios', auth.currentUser.uid), {
+    favoritos: yaEsFavorito ? arrayRemove(uidComercio) : arrayUnion(uidComercio)
+  });
+  if (yaEsFavorito) favoritosUid = favoritosUid.filter(id => id !== uidComercio);
+  else favoritosUid.push(uidComercio);
+  comerciosLista.forEach(c => { if (c.uid === uidComercio) c.esFavorito = !yaEsFavorito; });
+  mostrarListaComercios(comerciosLista);
+  cargarFavoritos();
 }
 
 async function elegirComercio(uid, nombre) {
   comercioSeleccionado = uid;
+  comercioSeleccionadoNombre = nombre;
   carrito = [];
   document.getElementById('lista-comercios').style.display = 'none';
   document.getElementById('zona-comercio').style.display = 'block';
@@ -202,6 +275,8 @@ async function confirmarPedido() {
   await addDoc(collection(db, 'pedidos'), {
     idCliente: auth.currentUser.uid,
     idComercio: comercioSeleccionado,
+    ciudadId: ciudadIdActual,
+    nombreComercio: comercioSeleccionadoNombre,
     nombreCliente: auth.currentUser.email,
     direccionCliente: direccion,
     productos: carrito,
