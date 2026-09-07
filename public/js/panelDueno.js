@@ -336,15 +336,21 @@ async function crearAdministrador() {
     const mensaje = encodeURIComponent(
       `Hola ${nombre}! Te creamos tu cuenta de administrador de Mujer Express para la ciudad de ${ciudadNombre}.\n\nUsuario: ${usuario}\nContraseña: ${clave}\n\nEntrá a la app y elegí "¿Sos administrador? Entrar con usuario".`
     );
-    if (whatsapp) {
-      document.getElementById('admin-whatsapp-listo').innerHTML = `
-        <p>✅ Administrador creado. Enviale las credenciales por WhatsApp:</p>
-        <a href="https://wa.me/${whatsapp}?text=${mensaje}" target="_blank">
-          <button>📲 Enviar credenciales por WhatsApp</button>
-        </a>`;
-    } else {
-      alert(`✅ Administrador creado.\n\nEnviale esto por WhatsApp:\n\nUsuario: ${usuario}\nContraseña: ${clave}`);
-    }
+    // Si cargaste el WhatsApp, el link abre directo esa conversación.
+    // Si no, wa.me/?text= abre WhatsApp y te deja elegir el contacto vos mismo.
+    const linkWhatsapp = whatsapp
+      ? `https://wa.me/${whatsapp}?text=${mensaje}`
+      : `https://wa.me/?text=${mensaje}`;
+
+    document.getElementById('admin-whatsapp-listo').innerHTML = `
+      <div style="border:2px solid #28a745; background:#f0fff4; border-radius:8px; padding:12px; margin-top:10px;">
+        <strong>✅ Administrador creado — guardá estos datos, no se van a volver a mostrar:</strong><br>
+        Usuario: <strong>${usuario}</strong><br>
+        Contraseña: <strong>${clave}</strong><br>
+        <a href="${linkWhatsapp}" target="_blank" style="text-decoration:none;">
+          <button style="margin-top:8px;">📲 Compartir por WhatsApp</button>
+        </a>
+      </div>`;
     cargarAdmins();
   } catch (e) {
     alert('Error al crear administrador: ' + e.message);
