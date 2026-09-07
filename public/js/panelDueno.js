@@ -62,9 +62,11 @@ export async function mostrar(usuario) {
         <p>Permisos limitados: aprueban usuarios y ven pedidos, NO modifican comisiones. La contraseña se genera automáticamente para que se la envíes por WhatsApp.</p>
         <input type="text" id="admin-nombre" placeholder="Nombre">
         <input type="text" id="admin-apellido" placeholder="Apellido">
+        <input type="text" id="admin-whatsapp" placeholder="WhatsApp del administrador (con código de país, ej: 59895205598)">
         <label>Ciudad que va a administrar:</label>
         <select id="admin-ciudad"><option value="">— Elegir ciudad —</option></select>
         <button onclick="crearAdministrador()">✅ Crear Administrador</button>
+        <div id="admin-whatsapp-listo"></div>
         <h4>Lista de Administradores</h4>
         <div id="lista-admins">Cargando...</div>
       </div>
@@ -291,6 +293,7 @@ async function exportarTodoExcel() {
 async function crearAdministrador() {
   const nombre = document.getElementById('admin-nombre').value.trim();
   const apellido = document.getElementById('admin-apellido').value.trim();
+  const whatsapp = document.getElementById('admin-whatsapp').value.trim().replace(/[^0-9]/g, '');
   const ciudadId = document.getElementById('admin-ciudad').value;
   const ciudadNombre = document.getElementById('admin-ciudad').selectedOptions[0]?.textContent || '';
   if (!nombre || !apellido) return alert('⚠️ Completá nombre y apellido');
@@ -315,7 +318,7 @@ async function crearAdministrador() {
 
     await setDoc(doc(db, 'usuarios', cred.user.uid), {
       nombre, apellido, nombreCompleto: `${nombre} ${apellido}`,
-      usuario, correo: correoInterno,
+      usuario, correo: correoInterno, whatsapp: whatsapp || null,
       rol: 'admin', aprobado: true, estado: 'aprobado',
       permisosLimitados: true,
       ciudadId, ciudadNombre,
@@ -326,9 +329,22 @@ async function crearAdministrador() {
     await signOut(authSecundaria);
     await deleteApp(appSecundaria);
 
-    alert(`✅ Administrador creado.\n\nEnviale esto por WhatsApp:\n\nUsuario: ${usuario}\nContraseña: ${clave}\n\n(Con esto entra en la pantalla de login, eligiendo "Soy administrador")`);
     document.getElementById('admin-nombre').value = '';
     document.getElementById('admin-apellido').value = '';
+    document.getElementById('admin-whatsapp').value = '';
+
+    const mensaje = encodeURIComponent(
+      `Hola ${nombre}! Te creamos tu cuenta de administrador de Mujer Express para la ciudad de ${ciudadNombre}.\n\nUsuario: ${usuario}\nContraseña: ${clave}\n\nEntrá a la app y elegí "¿Sos administrador? Entrar con usuario".`
+    );
+    if (whatsapp) {
+      document.getElementById('admin-whatsapp-listo').innerHTML = `
+        <p>✅ Administrador creado. Enviale las credenciales por WhatsApp:</p>
+        <a href="https://wa.me/${whatsapp}?text=${mensaje}" target="_blank">
+          <button>📲 Enviar credenciales por WhatsApp</button>
+        </a>`;
+    } else {
+      alert(`✅ Administrador creado.\n\nEnviale esto por WhatsApp:\n\nUsuario: ${usuario}\nContraseña: ${clave}`);
+    }
     cargarAdmins();
   } catch (e) {
     alert('Error al crear administrador: ' + e.message);

@@ -52,9 +52,11 @@ service cloud.firestore {
       allow delete: if esDueno();
     }
 
-    // --- Ciudades / Empresas (solo el Dueño las gestiona) ---
+    // --- Ciudades / Empresas (lectura pública: se necesita ANTES de
+    // loguearse, para el desplegable de la pantalla de registro. Solo
+    // el Dueño puede crearlas/editarlas) ---
     match /ciudades/{id} {
-      allow read: if estaLogueado();
+      allow read: if true;
       allow write: if esDueno();
     }
 

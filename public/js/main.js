@@ -3,12 +3,16 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from './firebase.js';
 import { mostrarLogin } from './loginRegistro.js';
+import { mostrarSplashDesarrollador } from './splashDesarrollador.js';
 
 window.cerrarSesion = () => {
   signOut(auth);
   location.reload();
 };
 
+mostrarSplashDesarrollador(iniciarApp);
+
+function iniciarApp() {
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     mostrarLogin();
@@ -78,3 +82,4 @@ onAuthStateChanged(auth, async (user) => {
     mostrarLogin();
   }
 });
+}
