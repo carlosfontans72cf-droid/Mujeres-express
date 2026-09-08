@@ -1,7 +1,7 @@
 import { db, auth } from './firebase.js';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { avisoAntiEstafaHTML } from './avisoAntiEstafa.js';
-import { listarTodasLasConversaciones, abrirChatObservador } from './chat.js';
+import { listarTodasLasConversaciones, abrirChatObservador, abrirChat } from './chat.js';
 
 // Panel del Administrador: mismo trabajo diario que el Dueño en cuanto a
 // aprobar/bloquear usuarios y ver pedidos, pero SIN acceso a comisiones
@@ -50,6 +50,7 @@ export async function mostrar(usuario) {
   window.rechazarUsuarioAdmin = rechazarUsuarioAdmin;
   window.bloquearUsuarioAdmin = bloquearUsuarioAdmin;
   window.verConversacionAdmin = (convId, nombres) => abrirChatObservador(convId, nombres);
+  window.chatConUsuarioAdmin = (uid, nombre) => { if (uid) abrirChat(uid, nombre); };
   window.cerrarSesion = async () => {
     const { signOut } = await import('firebase/auth');
     await signOut(auth);
@@ -97,6 +98,7 @@ async function cargarUsuariosAdmin() {
       ${!u.aprobado ? `<button onclick="aprobarUsuarioAdmin('${d.id}')">✅ Aprobar</button> <button onclick="rechazarUsuarioAdmin('${d.id}')">❌ Rechazar</button>` : ''}
       ${u.aprobado && !u.bloqueado ? `<button onclick="bloquearUsuarioAdmin('${d.id}')">🚫 Bloquear</button>` : ''}
       ${u.bloqueado ? `<button onclick="bloquearUsuarioAdmin('${d.id}')">✅ Desbloquear</button>` : ''}
+      <button onclick="chatConUsuarioAdmin('${d.id}','${(u.nombreCompleto||u.correo||'').replace(/'/g,"\\'")}')">💬 Chat</button>
     </div>`;
   });
   document.getElementById('admin-lista-usuarios').innerHTML = html || '<p>Sin usuarios registrados.</p>';

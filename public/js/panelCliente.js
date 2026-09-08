@@ -1,7 +1,8 @@
 import { db, auth } from './firebase.js';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, orderBy, onSnapshot } from 'firebase/firestore';
 import { avisoAntiEstafaHTML } from './avisoAntiEstafa.js';
 import { abrirChat } from './chat.js';
+import { abrirMapaRutaEnVivo } from './maps.js';
 
 let comerciosLista = [];
 let carrito = [];
@@ -72,7 +73,7 @@ export async function mostrar(usuario) {
     if (!comercioSeleccionado) return;
     abrirChat(comercioSeleccionado, comercioSeleccionadoNombre);
   };
-  window.verMapaRecorrido = () => alert('📍 Mapa con recorrido del repartidor');
+  window.verMapaRecorrido = verMapaRecorrido;
   window.cerrarComercio = () => {
     comercioSeleccionado = null;
     carrito = [];
@@ -198,6 +199,24 @@ async function marcarFavorito(uidComercio) {
   comerciosLista.forEach(c => { if (c.uid === uidComercio) c.esFavorito = !yaEsFavorito; });
   mostrarListaComercios(comerciosLista);
   cargarFavoritos();
+}
+
+async function verMapaRecorrido() {
+  const q = query(collection(db, 'pedidos'), where('idCliente', '==', auth.currentUser.uid), where('estado', '==', 'enCamino'));
+  const snap = await getDocs(q);
+  if (snap.empty) return alert('📦 No tenés ningún pedido en camino en este momento.');
+  const pedidoDoc = snap.docs[0];
+  const p = pedidoDoc.data();
+  const origenInicial = p.ubicacionRepartidor || { lat: -34.9, lng: -56.16 };
+
+  const mapaControl = await abrirMapaRutaEnVivo(
+    origenInicial, p.direccionCliente, '🛵 Repartidor en camino hacia tu pedido',
+    () => cancelarEscucha && cancelarEscucha()
+  );
+  const cancelarEscucha = onSnapshot(doc(db, 'pedidos', pedidoDoc.id), snapDoc => {
+    const datos = snapDoc.data();
+    if (datos?.ubicacionRepartidor) mapaControl.actualizar(datos.ubicacionRepartidor);
+  });
 }
 
 async function elegirComercio(uid, nombre) {

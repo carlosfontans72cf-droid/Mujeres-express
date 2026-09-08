@@ -49,11 +49,16 @@ window.alRolCambiar = async () => {
   const necesitaCiudad = rol === 'cliente' || rol === 'comercio' || rol === 'repartidor';
   document.getElementById('zona-ciudad-registro').style.display = necesitaCiudad ? 'block' : 'none';
   if (!necesitaCiudad) return;
-  const snap = await getDocs(query(collection(db, 'ciudades'), where('activa', '==', true)));
   const sel = document.getElementById('ciudad-registro');
-  let opciones = '<option value="">— Elegir ciudad —</option>';
-  snap.forEach(d => { opciones += `<option value="${d.id}">${d.data().nombre}</option>`; });
-  sel.innerHTML = opciones || '<option value="">Todavía no hay ciudades habilitadas</option>';
+  try {
+    const snap = await getDocs(query(collection(db, 'ciudades'), where('activa', '==', true)));
+    let opciones = '<option value="">— Elegir ciudad —</option>';
+    snap.forEach(d => { opciones += `<option value="${d.id}">${d.data().nombre}</option>`; });
+    sel.innerHTML = opciones || '<option value="">Todavía no hay ciudades habilitadas</option>';
+  } catch (e) {
+    sel.innerHTML = '<option value="">⚠️ Error al cargar ciudades — avisale a soporte</option>';
+    console.error('Error cargando ciudades:', e);
+  }
 };
 
 let modoAdminLogin = false;

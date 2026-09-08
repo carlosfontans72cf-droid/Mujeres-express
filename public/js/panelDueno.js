@@ -2,6 +2,7 @@ import { db, auth } from './firebase.js';
 import { collection, query, where, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { avisoAntiEstafaHTML } from './avisoAntiEstafa.js';
 import { abrirChat, listarTodasLasConversaciones, abrirChatObservador } from './chat.js';
+import { abrirMapaMultiple } from './maps.js';
 
 export async function mostrar(usuario) {
   const nom = usuario.nombreCompleto || usuario.nombre || 'Dueño';
@@ -19,6 +20,7 @@ export async function mostrar(usuario) {
         <button onclick="cambiarSeccion('pedidos')">📊 Todos los Pedidos</button>
         <button onclick="cambiarSeccion('admins')">👤 Crear Administradores</button>
         <button onclick="cambiarSeccion('chats')">👁️ Ver Conversaciones</button>
+        <button onclick="verMapaGeneral()">🗺️ Mapa en Vivo</button>
         <button onclick="cerrarSesion()">🚪 Salir</button>
       </div>
 
@@ -93,6 +95,7 @@ export async function mostrar(usuario) {
   window.crearAdministrador = crearAdministrador;
   window.exportarReportes = () => alert('📲 Reporte compartido por WhatsApp');
   window.exportarTodoExcel = exportarTodoExcel;
+  window.verMapaGeneral = verMapaGeneral;
   window.cerrarSesion = async () => {
   const { signOut } = await import('firebase/auth');
   const { auth } = await import('./firebase.js');
@@ -252,6 +255,19 @@ async function cargarPedidosTodos() {
   });
   html += `<hr><strong>💰 Total vendido: $${totalGeneral} | Comisión App ganada (${porcentajeApp}%): $${comisionAppTotal}</strong>`;
   document.getElementById('lista-pedidos-dueno').innerHTML = html || '<p>Sin pedidos registrados.</p>';
+}
+
+async function verMapaGeneral() {
+  const snap = await getDocs(query(collection(db, 'pedidos'), where('estado', '==', 'enCamino')));
+  const puntos = [];
+  snap.forEach(d => {
+    const p = d.data();
+    if (p.ubicacionRepartidor) {
+      puntos.push({ posicion: p.ubicacionRepartidor, etiqueta: `${p.nombreRepartidor || 'Repartidor'} → ${p.direccionCliente}` });
+    }
+  });
+  if (puntos.length === 0) return alert('📭 No hay repartidores en camino con ubicación disponible en este momento.');
+  abrirMapaMultiple(puntos, `🗺️ ${puntos.length} repartidor(es) en camino`);
 }
 
 async function cargarConversaciones() {

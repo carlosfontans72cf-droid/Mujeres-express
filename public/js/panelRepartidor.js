@@ -2,6 +2,10 @@ import { db, auth } from './firebase.js';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { avisoAntiEstafaHTML } from './avisoAntiEstafa.js';
 import { abrirChat } from './chat.js';
+import { abrirMapaRuta, obtenerUbicacionActual, iniciarSeguimientoUbicacion, detenerSeguimientoUbicacion } from './maps.js';
+
+let idsEnCaminoActuales = [];
+let watchIdUbicacion = null;
 
 let comisionRepartidorPct = 7;
 let miCiudadId = null;
@@ -50,6 +54,22 @@ export async function mostrar(usuario) {
 
   escucharPedidosDisponibles();
   escucharMisPedidos();
+  iniciarSeguimientoParaFirestore();
+}
+
+// Mientras el repartidor tenga algún pedido "en camino", vamos escribiendo
+// su ubicación en ese pedido para que el cliente y el dueño la vean en vivo.
+function iniciarSeguimientoParaFirestore() {
+  if (watchIdUbicacion != null) return;
+  watchIdUbicacion = iniciarSeguimientoUbicacion(async (posicion) => {
+    for (const idPedido of idsEnCaminoActuales) {
+      try {
+        await updateDoc(doc(db, 'pedidos', idPedido), {
+          ubicacionRepartidor: { ...posicion, fecha: new Date() }
+        });
+      } catch (e) { /* si falla un pedido puntual, seguimos con los demás */ }
+    }
+  });
 }
 
 function escucharPedidosDisponibles() {
@@ -93,20 +113,27 @@ async function aceptarPedido(idPedido, total) {
   alert(`✅ Pedido aceptado!\n💰 Tu ganancia: $${gananciaRepartidor}\n\n📍 Andá al comercio, retirá el pedido y seguí la ruta hacia el cliente.`);
 }
 
-function verRutaMapa(destino) {
-  alert(`🗺️ Mapa con ruta:\n📍 Comercio → 📍 ${destino}\n\nSe muestra recorrido paso a paso.`);
+async function verRutaMapa(destino) {
+  try {
+    const miPosicion = await obtenerUbicacionActual();
+    abrirMapaRuta(miPosicion, destino, 'Ruta hacia la entrega');
+  } catch (e) {
+    alert('⚠️ No pudimos obtener tu ubicación. Activá el GPS/ubicación del navegador e intentá de nuevo.\n\n' + e.message);
+  }
 }
 
 function escucharMisPedidos() {
   const q = query(collection(db, 'pedidos'), where('idRepartidor', '==', auth.currentUser.uid),
     where('estado', 'in', ['enCamino', 'entregado']));
   onSnapshot(q, snap => {
+    idsEnCaminoActuales = [];
     let html = '';
     if (snap.empty) {
       html = '<p>Sin pedidos aceptados todavía.</p>';
     } else {
       snap.forEach(d => {
         const p = d.data();
+        if (p.estado === 'enCamino') idsEnCaminoActuales.push(d.id);
         const gan = p.gananciaRepartidor || Math.round((p.total || 0) * (comisionRepartidorPct/100));
         html += `<div style="border:1px solid ${p.estado === 'entregado' ? '#ccc' : '#007bff'}; padding:10px; border-radius:6px; margin-bottom:4px;">
           <strong>📍 Entrega:</strong> ${p.direccionCliente}<br>
